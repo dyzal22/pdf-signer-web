@@ -1,0 +1,89 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Digital Signature</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 2em;
+            background: #f4f4f4;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        input[type="file"] {
+            display: block;
+            margin-bottom: 1em;
+        }
+
+        button {
+            width: 100%;
+            padding: 0.8em;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+            button:hover {
+                background: #0056b3;
+            }
+
+        #loader {
+            display: none;
+            text-align: center;
+            margin-top: 1em;
+        }
+
+        #results {
+            margin-top: 1.5em;
+            background: #eee;
+            padding: 1em;
+            border-radius: 4px;
+            word-wrap: break-word;
+        }
+
+        pre {
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Buat Digital Signature untuk PDF</h1>
+
+        <label for="pdfUploader">Pilih file PDF:</label>
+        <input type="file" id="pdfUploader" accept=".pdf">
+
+        <button id="signButton">Buat Tanda Tangan</button>
+
+        <div id="loader">Memproses...</div>
+
+        <div id="results" style="display:none;">
+            <h3>Hasil:</h3>
+            <strong>Hash (SHA-256) Dokumen:</strong>
+            <pre id="hashResult"></pre>
+
+            <strong>Digital Signature (Base64):</strong>
+            <pre id="sigResult"></pre>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
