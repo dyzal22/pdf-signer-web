@@ -1,4 +1,4 @@
-// ======= UTILITAS DASAR =======
+// ========== UTILITAS ==========
 async function fileToArrayBuffer(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -33,7 +33,7 @@ async function signWithPrivateKey(privateKeyPem, dataBuffer) {
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
-// ======= SIGN PDF =======
+// ========== DIGITAL SIGNATURE ==========
 document.getElementById("signButton").addEventListener("click", async () => {
   const fileInput = document.getElementById("pdfUploader");
   const privateKey = document.getElementById("privateKey").value.trim();
@@ -59,11 +59,12 @@ document.getElementById("signButton").addEventListener("click", async () => {
     const dataBuffer = encoder.encode(hashHex);
     const signatureB64 = await signWithPrivateKey(privateKey, dataBuffer);
 
+    // tampilkan hasil
     hashResult.textContent = hashHex;
     sigResult.textContent = signatureB64;
     results.style.display = "block";
 
-    // ===== Embed Signature ke PDF =====
+    // tambahkan ke PDF
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
@@ -71,7 +72,7 @@ document.getElementById("signButton").addEventListener("click", async () => {
 
     const text = `Digital Signature:
 Hash (SHA-256): ${hashHex}
-Signature: ${signatureB64.substring(0, 80)}...
+Signature (Base64): ${signatureB64.substring(0, 80)}...
 Date: ${new Date().toLocaleString()}`;
 
     lastPage.drawText(text, {
@@ -102,7 +103,7 @@ Date: ${new Date().toLocaleString()}`;
   }
 });
 
-// ======= VERIFIKASI SIGNATURE =======
+// ========== VERIFIKASI SIGNATURE ==========
 async function importPublicKey(pem) {
   const keyData = pem
     .replace(/-----BEGIN PUBLIC KEY-----/, "")
@@ -164,22 +165,17 @@ document.getElementById("verifyButton").addEventListener("click", async () => {
   }
 });
 
-// ======= TAB SWITCHING =======
-const tabSign = document.getElementById("tab-sign");
-const tabVerify = document.getElementById("tab-verify");
-const contentSign = document.getElementById("content-sign");
-const contentVerify = document.getElementById("content-verify");
-
-tabSign.addEventListener("click", () => {
-  tabSign.classList.add("active");
-  tabVerify.classList.remove("active");
-  contentSign.classList.add("active");
-  contentVerify.classList.remove("active");
+// ========== TAB SWITCH ==========
+document.getElementById("tab-sign").addEventListener("click", () => {
+  document.getElementById("tab-sign").classList.add("active");
+  document.getElementById("tab-verify").classList.remove("active");
+  document.getElementById("content-sign").classList.add("active");
+  document.getElementById("content-verify").classList.remove("active");
 });
 
-tabVerify.addEventListener("click", () => {
-  tabVerify.classList.add("active");
-  tabSign.classList.remove("active");
-  contentVerify.classList.add("active");
-  contentSign.classList.remove("active");
+document.getElementById("tab-verify").addEventListener("click", () => {
+  document.getElementById("tab-verify").classList.add("active");
+  document.getElementById("tab-sign").classList.remove("active");
+  document.getElementById("content-verify").classList.add("active");
+  document.getElementById("content-sign").classList.remove("active");
 });
