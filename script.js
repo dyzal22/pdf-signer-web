@@ -179,3 +179,62 @@ document.getElementById("tab-verify").addEventListener("click", () => {
   document.getElementById("content-verify").classList.add("active");
   document.getElementById("content-sign").classList.remove("active");
 });
+
+// ========== VERIFIKASI SIGNED PDF (TAB 3) ==========
+document.getElementById("tab-verify-signed").addEventListener("click", () => {
+  document.querySelectorAll(".tab, .content").forEach(el => el.classList.remove("active"));
+  document.getElementById("tab-verify-signed").classList.add("active");
+  document.getElementById("content-verify-signed").classList.add("active");
+});
+
+document.getElementById("verifySignedButton").addEventListener("click", async () => {
+  const fileInput = document.getElementById("verifySignedPdf");
+  const publicKeyPem = document.getElementById("publicKey2").value.trim();
+  const signatureB64 = document.getElementById("signatureInput2").value.trim();
+  const resultDiv = document.getElementById("verifySignedResult");
+
+  if (!fileInput.files.length || !publicKeyPem || !signatureB64) {
+    alert("Lengkapi semua kolom terlebih dahulu!");
+    return;
+  }
+
+  resultDiv.style.display = "none";
+  resultDiv.textContent = "";
+
+  try {
+    const file = fileInput.files[0];
+    const arrayBuffer = await fileToArrayBuffer(file);
+
+    // 1️⃣ Hitung ulang hash dari PDF (signed)
+    const hashHex = await calculateSHA256(arrayBuffer);
+
+    // 2️⃣ Import public key
+    const publicKey = await importPublicKey(publicKeyPem);
+
+    // 3️⃣ Decode signature base64
+    const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
+
+    // 4️⃣ Verifikasi
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(hashHex);
+    const isValid = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      publicKey,
+      signatureBytes,
+      dataBuffer
+    );
+
+    resultDiv.style.display = "block";
+    if (isValid) {
+      resultDiv.textContent = "✅ Signed PDF VALID — dokumen tidak diubah dan signature cocok.";
+      resultDiv.style.background = "#c8f7c5";
+    } else {
+      resultDiv.textContent = "❌ Signed PDF TIDAK VALID — file diubah atau signature salah.";
+      resultDiv.style.background = "#f7c5c5";
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+    console.error(err);
+  }
+});
+
