@@ -1,3 +1,4 @@
+// ======= UTILITAS DASAR =======
 async function fileToArrayBuffer(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -32,6 +33,7 @@ async function signWithPrivateKey(privateKeyPem, dataBuffer) {
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
+// ======= SIGN PDF =======
 document.getElementById("signButton").addEventListener("click", async () => {
   const fileInput = document.getElementById("pdfUploader");
   const privateKey = document.getElementById("privateKey").value.trim();
@@ -61,7 +63,7 @@ document.getElementById("signButton").addEventListener("click", async () => {
     sigResult.textContent = signatureB64;
     results.style.display = "block";
 
-    // Embed ke PDF
+    // ===== Embed Signature ke PDF =====
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
@@ -98,4 +100,86 @@ Date: ${new Date().toLocaleString()}`;
   } finally {
     loader.style.display = "none";
   }
+});
+
+// ======= VERIFIKASI SIGNATURE =======
+async function importPublicKey(pem) {
+  const keyData = pem
+    .replace(/-----BEGIN PUBLIC KEY-----/, "")
+    .replace(/-----END PUBLIC KEY-----/, "")
+    .replace(/\s+/g, "");
+  const binaryDer = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
+
+  return crypto.subtle.importKey(
+    "spki",
+    binaryDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+}
+
+document.getElementById("verifyButton").addEventListener("click", async () => {
+  const fileInput = document.getElementById("verifyPdf");
+  const publicKeyPem = document.getElementById("publicKey").value.trim();
+  const signatureB64 = document.getElementById("signatureInput").value.trim();
+  const verifyResultDiv = document.getElementById("verifyResult");
+
+  if (!fileInput.files.length || !publicKeyPem || !signatureB64) {
+    alert("Lengkapi semua data: PDF, public key, dan signature.");
+    return;
+  }
+
+  verifyResultDiv.style.display = "none";
+  verifyResultDiv.textContent = "";
+
+  try {
+    const file = fileInput.files[0];
+    const arrayBuffer = await fileToArrayBuffer(file);
+    const hashHex = await calculateSHA256(arrayBuffer);
+
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(hashHex);
+    const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
+
+    const publicKey = await importPublicKey(publicKeyPem);
+    const isValid = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      publicKey,
+      signatureBytes,
+      dataBuffer
+    );
+
+    verifyResultDiv.style.display = "block";
+    if (isValid) {
+      verifyResultDiv.textContent = "✅ Signature VALID — file belum diubah dan kunci cocok.";
+      verifyResultDiv.style.background = "#c8f7c5";
+    } else {
+      verifyResultDiv.textContent = "❌ Signature TIDAK VALID — file diubah atau kunci tidak cocok.";
+      verifyResultDiv.style.background = "#f7c5c5";
+    }
+  } catch (err) {
+    alert("Error saat verifikasi: " + err.message);
+    console.error(err);
+  }
+});
+
+// ======= TAB SWITCHING =======
+const tabSign = document.getElementById("tab-sign");
+const tabVerify = document.getElementById("tab-verify");
+const contentSign = document.getElementById("content-sign");
+const contentVerify = document.getElementById("content-verify");
+
+tabSign.addEventListener("click", () => {
+  tabSign.classList.add("active");
+  tabVerify.classList.remove("active");
+  contentSign.classList.add("active");
+  contentVerify.classList.remove("active");
+});
+
+tabVerify.addEventListener("click", () => {
+  tabVerify.classList.add("active");
+  tabSign.classList.remove("active");
+  contentVerify.classList.add("active");
+  contentSign.classList.remove("active");
 });
