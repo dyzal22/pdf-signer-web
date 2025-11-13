@@ -58,6 +58,7 @@ async function signWithPrivateKey(privateKeyPem, dataBuffer) {
 // ========== BAGIAN 2. DIGITAL SIGNATURE (Tab 1) ===============
 // =============================================================
 // Tujuan: Menghasilkan tanda tangan digital PDF + menyisipkan hasil signature ke dalam dokumen PDF.
+
 document.getElementById("signButton").addEventListener("click", async () => {
   const fileInput = document.getElementById("pdfUploader");
   const privateKey = document.getElementById("privateKey").value.trim();
@@ -66,6 +67,7 @@ document.getElementById("signButton").addEventListener("click", async () => {
   const hashResult = document.getElementById("hashResult");
   const sigResult = document.getElementById("sigResult");
 
+  // Validasi input
   if (!fileInput.files.length || !privateKey) {
     alert("Silakan pilih PDF dan masukkan private key!");
     return;
@@ -77,39 +79,32 @@ document.getElementById("signButton").addEventListener("click", async () => {
   try {
     const file = fileInput.files[0];
 
-    // 1️⃣ Baca file PDF dan hitung hash
+    // 1️⃣ Baca file PDF sebagai ArrayBuffer
     const arrayBuffer = await fileToArrayBuffer(file);
+
+    // 2️⃣ Hitung hash SHA-256 (integrity check)
     const hashHex = await calculateSHA256(arrayBuffer);
 
-    // 2️⃣ Buat signature dengan private key
+    // 3️⃣ Encode hash dan tanda tangani dengan private key
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(hashHex);
     const signatureB64 = await signWithPrivateKey(privateKey, dataBuffer);
 
-    // 3️⃣ Tampilkan hasil di panel hasil
+    // 4️⃣ Tampilkan hasil hash dan signature
     hashResult.textContent = hashHex;
     sigResult.textContent = signatureB64;
     results.style.display = "block";
 
-    // 4️⃣ Sisipkan ke PDF dalam format ringkas
+    // 5️⃣ Sisipkan hasil tanda tangan ke dalam PDF (menggunakan PDFLib)
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
     const { width } = lastPage.getSize();
 
-    // Simbolisasi tanda tangan agar lebih pendek dan rapi
-    // Tetap menyimpan hash & signature lengkap di metadata internal PDF
-    pdfDoc.setTitle("Signed PDF by Andy Afrizal");
-    pdfDoc.setSubject("Digital Signature with hidden verification metadata");
-    pdfDoc.setKeywords(["DigitalSignature", "AndyAfrizal", "Secure"]);
-
-    // Simpan metadata asli agar bisa diverifikasi nanti
-    pdfDoc.setProducer(signatureB64);
-    pdfDoc.setCreator(hashHex);
-
-    // Format tampilan tanda tangan pendek
+    // Tambahkan teks signature ke halaman terakhir
     const text = `Digital Signature:
-SignAndyAfrizal/signaturecode
+Hash (SHA-256): ${hashHex}
+Signature (Base64): ${signatureB64.substring(0, 80)}...
 Date: ${new Date().toLocaleString()}`;
 
     lastPage.drawText(text, {
@@ -120,7 +115,7 @@ Date: ${new Date().toLocaleString()}`;
       lineHeight: 12,
     });
 
-    // 5️⃣ Simpan hasil PDF baru
+    // 6️⃣ Simpan PDF yang sudah disigned dan siapkan tombol download
     const signedPdfBytes = await pdfDoc.save();
     const blob = new Blob([signedPdfBytes], { type: "application/pdf" });
 
@@ -140,6 +135,7 @@ Date: ${new Date().toLocaleString()}`;
     loader.style.display = "none";
   }
 });
+
 
 // =============================================================
 // ========== BAGIAN 3. VERIFIKASI SIGNATURE (Tab 2) ============
