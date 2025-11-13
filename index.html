@@ -1,23 +1,52 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF Digital Signature</title>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
   <style>
     body {
-      font-family: sans-serif;
-      background: #f4f4f4;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f4f6f8;
       padding: 2em;
+      color: #222;
     }
     .container {
-      max-width: 600px;
+      max-width: 700px;
       margin: auto;
-      background: white;
-      border-radius: 8px;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #eee;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 1em;
+      cursor: pointer;
+      background: #f9f9f9;
+      border-right: 1px solid #eee;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    .tab:last-child {
+      border-right: none;
+    }
+    .tab.active {
+      background: #007bff;
+      color: white;
+    }
+    .content {
       padding: 2em;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      display: none;
+    }
+    .content.active {
+      display: block;
     }
     input, textarea, button {
       width: 100%;
@@ -29,8 +58,9 @@
       background: #007bff;
       color: white;
       border: none;
-      border-radius: 5px;
+      border-radius: 6px;
       cursor: pointer;
+      transition: background 0.2s;
     }
     button:hover {
       background: #0056b3;
@@ -38,37 +68,55 @@
     pre {
       background: #eee;
       padding: 1em;
-      border-radius: 5px;
+      border-radius: 6px;
       white-space: pre-wrap;
       word-break: break-word;
+    }
+    #verifyResult {
+      padding: 1em;
+      border-radius: 6px;
+      margin-top: 1em;
+      font-weight: 600;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h2>Digital Signature PDF</h2>
-
-    <label for="pdfUploader">Pilih File PDF:</label>
-    <input type="file" id="pdfUploader" accept=".pdf">
-
-    <label for="privateKey">Masukkan Private Key (PEM):</label>
-    <textarea id="privateKey" rows="6" placeholder="-----BEGIN PRIVATE KEY----- ..."></textarea>
-
-    <button id="signButton">Tandatangani Dokumen</button>
-
-    <div id="loader" style="display:none;">⏳ Memproses...</div>
-
-    <div id="results" style="display:none;">
-      <h3>Hasil Tanda Tangan</h3>
-      <strong>Hash (SHA-256):</strong>
-      <pre id="hashResult"></pre>
-      <strong>Digital Signature (Base64):</strong>
-      <pre id="sigResult"></pre>
-
-      <button id="downloadBtn">💾 Download Signed PDF</button>
+    <div class="tabs">
+      <div id="tab-sign" class="tab active">🖋️ Digital Signature</div>
+      <div id="tab-verify" class="tab">🔍 Verifikasi Signature</div>
     </div>
-  </div>
 
-  <script src="script.js"></script>
-</body>
-</html>
+    <!-- TAB 1: DIGITAL SIGNATURE -->
+    <div id="content-sign" class="content active">
+      <h2>Buat Digital Signature PDF</h2>
+
+      <label for="pdfUploader">Pilih File PDF:</label>
+      <input type="file" id="pdfUploader" accept=".pdf" />
+
+      <label for="privateKey">Masukkan Private Key (PEM):</label>
+      <textarea id="privateKey" rows="6" placeholder="-----BEGIN PRIVATE KEY----- ..."></textarea>
+
+      <button id="signButton">Tandatangani Dokumen</button>
+      <div id="loader" style="display:none;">⏳ Memproses...</div>
+
+      <div id="results" style="display:none;">
+        <h3>Hasil Tanda Tangan</h3>
+        <strong>Hash (SHA-256):</strong>
+        <pre id="hashResult"></pre>
+        <strong>Digital Signature (Base64):</strong>
+        <pre id="sigResult"></pre>
+
+        <button id="downloadBtn">💾 Download Signed PDF</button>
+      </div>
+    </div>
+
+    <!-- TAB 2: VERIFICATION -->
+    <div id="content-verify" class="content">
+      <h2>Verifikasi Digital Signature</h2>
+
+      <label for="verifyPdf">Pilih File PDF:</label>
+      <input type="file" id="verifyPdf" accept=".pdf" />
+
+      <label for="publicKey">Masukkan Public Key (PEM):</label>
+      <textarea id="publicKey" rows="6" placeholder="-----BEGIN PUBLIC KEY----- ...">
