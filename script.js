@@ -236,8 +236,12 @@ document.getElementById("tab-verify").addEventListener("click", () => {
 // Tujuan: Mengecek keaslian file PDF yang sudah disigned dan memiliki hash & signature tertanam di dalamnya.
 
 document.getElementById("tab-verify-signed").addEventListener("click", () => {
-  document.querySelectorAll(".tab, .content").forEach(el => el.classList.remove("active"));
+  document.getElementById("tab-sign").classList.remove("active");
+  document.getElementById("tab-verify").classList.remove("active");
   document.getElementById("tab-verify-signed").classList.add("active");
+
+  document.getElementById("content-sign").classList.remove("active");
+  document.getElementById("content-verify").classList.remove("active");
   document.getElementById("content-verify-signed").classList.add("active");
 });
 
