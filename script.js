@@ -180,12 +180,30 @@ document.getElementById("tab-verify").addEventListener("click", () => {
   document.getElementById("content-sign").classList.remove("active");
 });
 
-// ========== VERIFIKASI SIGNED PDF (TAB 3) ==========
+// ========== VERIFIKASI SIGNED PDF (TAB 3 - FIXED VERSION) ==========
 document.getElementById("tab-verify-signed").addEventListener("click", () => {
   document.querySelectorAll(".tab, .content").forEach(el => el.classList.remove("active"));
   document.getElementById("tab-verify-signed").classList.add("active");
   document.getElementById("content-verify-signed").classList.add("active");
 });
+
+async function extractTextFromPDF(arrayBuffer) {
+  const pdfjsLib = window['pdfjs-dist/build/pdf'];
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js";
+
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let textContent = "";
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const text = await page.getTextContent();
+    text.items.forEach((item) => {
+      textContent += item.str + "\n";
+    });
+  }
+  return textContent;
+}
 
 document.getElementById("verifySignedButton").addEventListener("click", async () => {
   const fileInput = document.getElementById("verifySignedPdf");
@@ -205,18 +223,25 @@ document.getElementById("verifySignedButton").addEventListener("click", async ()
     const file = fileInput.files[0];
     const arrayBuffer = await fileToArrayBuffer(file);
 
-    // 1️⃣ Hitung ulang hash dari PDF (signed)
-    const hashHex = await calculateSHA256(arrayBuffer);
+    // 1️⃣ Ekstrak teks dari PDF
+    const pdfText = await extractTextFromPDF(arrayBuffer);
 
-    // 2️⃣ Import public key
+    // 2️⃣ Cari hash yang tertanam (baris "Hash (SHA-256): xxxxx")
+    const match = pdfText.match(/Hash \(SHA-256\): ([A-Fa-f0-9]+)/);
+    if (!match) throw new Error("Hash tidak ditemukan di dalam PDF signed.");
+
+    const embeddedHash = match[1];
+    console.log("Embedded hash:", embeddedHash);
+
+    // 3️⃣ Import public key
     const publicKey = await importPublicKey(publicKeyPem);
 
-    // 3️⃣ Decode signature base64
+    // 4️⃣ Decode signature base64
     const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
 
-    // 4️⃣ Verifikasi
+    // 5️⃣ Verifikasi signature terhadap hash yang tertanam
     const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(hashHex);
+    const dataBuffer = encoder.encode(embeddedHash);
     const isValid = await crypto.subtle.verify(
       "RSASSA-PKCS1-v1_5",
       publicKey,
@@ -226,10 +251,10 @@ document.getElementById("verifySignedButton").addEventListener("click", async ()
 
     resultDiv.style.display = "block";
     if (isValid) {
-      resultDiv.textContent = "✅ Signed PDF VALID — dokumen tidak diubah dan signature cocok.";
+      resultDiv.textContent = "✅ Signed PDF VALID — hash cocok dengan signature dan public key.";
       resultDiv.style.background = "#c8f7c5";
     } else {
-      resultDiv.textContent = "❌ Signed PDF TIDAK VALID — file diubah atau signature salah.";
+      resultDiv.textContent = "❌ Signed PDF TIDAK VALID — signature atau hash tidak sesuai.";
       resultDiv.style.background = "#f7c5c5";
     }
   } catch (err) {
