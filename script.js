@@ -1,129 +1,101 @@
-// script.js (client-side signing with PEM keys)
+async function fileToArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
 
-document.getElementById('signButton').addEventListener('click', async () => {
-  const fileInput = document.getElementById('pdfUploader');
-  const loader = document.getElementById('loader');
-  const resultsDiv = document.getElementById('results');
-  const hashResult = document.getElementById('hashResult');
-  const sigResult = document.getElementById('sigResult');
+async function calculateSHA256(buffer) {
+  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
-  const privatePem = document.getElementById('privateKey')?.value.trim();
-  const publicPem  = document.getElementById('publicKey')?.value.trim(); // optional verify
+async function signWithPrivateKey(privateKeyPem, dataBuffer) {
+  const keyData = privateKeyPem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+  const binaryDer = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
 
-  if (fileInput.files.length === 0) {
-    alert("Silakan pilih file PDF terlebih dahulu.");
+  const privateKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, dataBuffer);
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+document.getElementById("signButton").addEventListener("click", async () => {
+  const fileInput = document.getElementById("pdfUploader");
+  const privateKey = document.getElementById("privateKey").value.trim();
+  const loader = document.getElementById("loader");
+  const results = document.getElementById("results");
+  const hashResult = document.getElementById("hashResult");
+  const sigResult = document.getElementById("sigResult");
+
+  if (!fileInput.files.length || !privateKey) {
+    alert("Silakan pilih PDF dan masukkan private key!");
     return;
   }
-  if (!privatePem) {
-    const ok = confirm("Private key belum diisi. Melanjutkan tanpa private key akan menghentikan proses. Isi private key sekarang?");
-    if (!ok) return;
-  }
 
-  const file = fileInput.files[0];
-  loader.style.display = 'block';
-  resultsDiv.style.display = 'none';
+  loader.style.display = "block";
+  results.style.display = "none";
 
   try {
-    // --- baca file sebagai ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer();
+    const file = fileInput.files[0];
+    const arrayBuffer = await fileToArrayBuffer(file);
+    const hashHex = await calculateSHA256(arrayBuffer);
 
-    // --- 1) hitung SHA-256 hash (hex) dari file
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashHex = bufferToHex(hashBuffer);
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(hashHex);
+    const signatureB64 = await signWithPrivateKey(privateKey, dataBuffer);
 
-    // --- 2) import private key (PEM PKCS#8) ke CryptoKey
-    const privateKey = await importPrivateKeyFromPem(privatePem);
-
-    // --- 3) sign data (kita akan sign seluruh file ArrayBuffer)
-    // algorithm: RSASSA-PKCS1-v1_5 with SHA-256
-    const signatureBuffer = await crypto.subtle.sign(
-      { name: 'RSASSA-PKCS1-v1_5' },
-      privateKey,
-      arrayBuffer
-    );
-    const signatureBase64 = arrayBufferToBase64(signatureBuffer);
-
-    // --- 4) (optional) verify with public key provided
-    let verifyOk = null;
-    if (publicPem) {
-      const pubKey = await importPublicKeyFromPem(publicPem);
-      verifyOk = await crypto.subtle.verify(
-        { name: 'RSASSA-PKCS1-v1_5' },
-        pubKey,
-        signatureBuffer,
-        arrayBuffer
-      );
-    }
-
-    // --- tampilkan hasil
     hashResult.textContent = hashHex;
-    sigResult.textContent = signatureBase64;
-    if (verifyOk !== null) {
-      sigResult.textContent += `\n\n(Verifikasi dengan public key: ${verifyOk ? 'OK' : 'GAGAL'})`;
-    }
-    resultsDiv.style.display = 'block';
+    sigResult.textContent = signatureB64;
+    results.style.display = "block";
+
+    // Embed ke PDF
+    const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+    const pages = pdfDoc.getPages();
+    const lastPage = pages[pages.length - 1];
+    const { width } = lastPage.getSize();
+
+    const text = `Digital Signature:
+Hash (SHA-256): ${hashHex}
+Signature: ${signatureB64.substring(0, 80)}...
+Date: ${new Date().toLocaleString()}`;
+
+    lastPage.drawText(text, {
+      x: 50,
+      y: 80,
+      size: 10,
+      maxWidth: width - 100,
+      lineHeight: 12,
+    });
+
+    const signedPdfBytes = await pdfDoc.save();
+    const blob = new Blob([signedPdfBytes], { type: "application/pdf" });
+
+    const downloadBtn = document.getElementById("downloadBtn");
+    downloadBtn.onclick = () => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `signed_${file.name}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert("Error: " + err.message);
     console.error(err);
   } finally {
-    loader.style.display = 'none';
+    loader.style.display = "none";
   }
 });
-
-/* ----------------- util functions ----------------- */
-
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function bufferToHex(buffer) {
-  const bytes = new Uint8Array(buffer);
-  return Array.prototype.map.call(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function pemToBinary(pem) {
-  // remove header/footer and newlines
-  const b64 = pem.replace(/-----BEGIN [^-]+-----/g, '')
-                 .replace(/-----END [^-]+-----/g, '')
-                 .replace(/\s+/g, '');
-  return base64ToArrayBuffer(b64);
-}
-
-async function importPrivateKeyFromPem(pem) {
-  if (!pem) throw new Error('Private key PEM kosong');
-  // expect PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)
-  const binary = pemToBinary(pem);
-  return await crypto.subtle.importKey(
-    'pkcs8',
-    binary,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false, // not extractable
-    ['sign']
-  );
-}
-
-async function importPublicKeyFromPem(pem) {
-  if (!pem) throw new Error('Public key PEM kosong');
-  // expect SPKI PEM (-----BEGIN PUBLIC KEY-----)
-  const binary = pemToBinary(pem);
-  return await crypto.subtle.importKey(
-    'spki',
-    binary,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    true,
-    ['verify']
-  );
-}
