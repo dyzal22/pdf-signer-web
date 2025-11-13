@@ -88,6 +88,7 @@
     <div class="tabs">
       <div id="tab-sign" class="tab active">🖋️ Digital Signature</div>
       <div id="tab-verify" class="tab">🔍 Verifikasi Signature</div>
+      <div id="tab-verify-signed" class="tab">📄 Verifikasi Signed PDF</div>
     </div>
 
     <!-- TAB 1 -->
@@ -118,6 +119,15 @@
       <div id="verifyResult" style="display:none;"></div>
     </div>
   </div>
+    <!-- TAB 3 -->
+<div id="content-verify-signed" class="content">
+  <h2>Verifikasi Signed Document</h2>
+  <input type="file" id="verifySignedPdf" accept=".pdf" />
+  <textarea id="publicKey2" rows="6" placeholder="-----BEGIN PUBLIC KEY----- ..."></textarea>
+  <textarea id="signatureInput2" rows="3" placeholder="Tempel signature dari hasil tanda tangan"></textarea>
+  <button id="verifySignedButton">Verifikasi Signed PDF</button>
+  <div id="verifySignedResult" style="display:none;"></div>
+</div>
 
   <!-- script harus di-load SETELAH elemen DOM -->
   <script src="script.js"></script>
