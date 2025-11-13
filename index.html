@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: "Segoe UI", sans-serif;
       background: #f4f6f8;
       padding: 2em;
       color: #222;
@@ -48,11 +48,14 @@
     .content.active {
       display: block;
     }
-    input, textarea, button {
+    input,
+    textarea,
+    button {
       width: 100%;
       margin-bottom: 1em;
       padding: 0.8em;
       font-size: 1em;
+      box-sizing: border-box;
     }
     button {
       background: #007bff;
@@ -87,16 +90,11 @@
       <div id="tab-verify" class="tab">🔍 Verifikasi Signature</div>
     </div>
 
-    <!-- TAB 1: DIGITAL SIGNATURE -->
+    <!-- TAB 1 -->
     <div id="content-sign" class="content active">
       <h2>Buat Digital Signature PDF</h2>
-
-      <label for="pdfUploader">Pilih File PDF:</label>
       <input type="file" id="pdfUploader" accept=".pdf" />
-
-      <label for="privateKey">Masukkan Private Key (PEM):</label>
       <textarea id="privateKey" rows="6" placeholder="-----BEGIN PRIVATE KEY----- ..."></textarea>
-
       <button id="signButton">Tandatangani Dokumen</button>
       <div id="loader" style="display:none;">⏳ Memproses...</div>
 
@@ -106,17 +104,22 @@
         <pre id="hashResult"></pre>
         <strong>Digital Signature (Base64):</strong>
         <pre id="sigResult"></pre>
-
         <button id="downloadBtn">💾 Download Signed PDF</button>
       </div>
     </div>
 
-    <!-- TAB 2: VERIFICATION -->
+    <!-- TAB 2 -->
     <div id="content-verify" class="content">
       <h2>Verifikasi Digital Signature</h2>
-
-      <label for="verifyPdf">Pilih File PDF:</label>
       <input type="file" id="verifyPdf" accept=".pdf" />
+      <textarea id="publicKey" rows="6" placeholder="-----BEGIN PUBLIC KEY----- ..."></textarea>
+      <textarea id="signatureInput" rows="3" placeholder="Tempel signature dari hasil tanda tangan"></textarea>
+      <button id="verifyButton">Verifikasi Signature</button>
+      <div id="verifyResult" style="display:none;"></div>
+    </div>
+  </div>
 
-      <label for="publicKey">Masukkan Public Key (PEM):</label>
-      <textarea id="publicKey" rows="6" placeholder="-----BEGIN PUBLIC KEY----- ...">
+  <!-- script harus di-load SETELAH elemen DOM -->
+  <script src="script.js"></script>
+</body>
+</html>
