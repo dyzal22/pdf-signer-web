@@ -3,132 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF Digital Signature (Client-Side)</title>
+  <title>PDF Digital Signature</title>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
   <style>
     body {
-      font-family: "Segoe UI", sans-serif;
-      background: #f2f4f8;
-      margin: 0;
-      padding: 0;
-    }
-
-    .container {
-      max-width: 700px;
-      margin: 3em auto;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      font-family: sans-serif;
+      background: #f4f4f4;
       padding: 2em;
     }
-
-    h1 {
-      text-align: center;
-      color: #333;
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background: white;
+      border-radius: 8px;
+      padding: 2em;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    input, textarea, button {
+      width: 100%;
       margin-bottom: 1em;
+      padding: 0.8em;
+      font-size: 1em;
     }
-
-    label {
-      font-weight: 600;
-      display: block;
-      margin-top: 1em;
-      margin-bottom: 0.4em;
-    }
-
-    input[type="file"],
-    textarea {
-      width: 100%;
-      font-size: 0.95em;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      padding: 0.6em;
-      box-sizing: border-box;
-      resize: vertical;
-    }
-
-    textarea {
-      font-family: monospace;
-    }
-
     button {
-      width: 100%;
-      margin-top: 1.5em;
       background: #007bff;
       color: white;
       border: none;
-      border-radius: 6px;
-      font-size: 1em;
-      padding: 0.9em;
+      border-radius: 5px;
       cursor: pointer;
-      transition: background 0.2s ease;
     }
-
     button:hover {
       background: #0056b3;
     }
-
-    #loader {
-      display: none;
-      text-align: center;
-      color: #666;
-      margin-top: 1em;
-    }
-
-    #results {
-      display: none;
-      margin-top: 1.5em;
-      background: #f9f9f9;
-      border-radius: 8px;
-      padding: 1em;
-      border: 1px solid #ddd;
-    }
-
     pre {
+      background: #eee;
+      padding: 1em;
+      border-radius: 5px;
       white-space: pre-wrap;
       word-break: break-word;
-      background: #eee;
-      padding: 0.8em;
-      border-radius: 5px;
     }
-
-    footer {
-      text-align: center;
-      color: #888;
-      font-size: 0.9em;
-      margin-top: 2em;
-    }
-
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>PDF Digital Signature</h1>
+    <h2>Digital Signature PDF</h2>
 
     <label for="pdfUploader">Pilih File PDF:</label>
     <input type="file" id="pdfUploader" accept=".pdf">
 
-    <label for="privateKey">Private Key (PEM - PKCS#8):</label>
-    <textarea id="privateKey" rows="7" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"></textarea>
-
-    <label for="publicKey">Public Key (PEM - SPKI) (Opsional, untuk verifikasi):</label>
-    <textarea id="publicKey" rows="6" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
+    <label for="privateKey">Masukkan Private Key (PEM):</label>
+    <textarea id="privateKey" rows="6" placeholder="-----BEGIN PRIVATE KEY----- ..."></textarea>
 
     <button id="signButton">Tandatangani Dokumen</button>
 
-    <div id="loader">Memproses dokumen dan membuat tanda tangan...</div>
+    <div id="loader" style="display:none;">⏳ Memproses...</div>
 
-    <div id="results">
-      <h3>Hasil:</h3>
-      <strong>Hash (SHA-256) Dokumen:</strong>
+    <div id="results" style="display:none;">
+      <h3>Hasil Tanda Tangan</h3>
+      <strong>Hash (SHA-256):</strong>
       <pre id="hashResult"></pre>
-
       <strong>Digital Signature (Base64):</strong>
       <pre id="sigResult"></pre>
+
+      <button id="downloadBtn">💾 Download Signed PDF</button>
     </div>
   </div>
-
-  <footer>
-    Dibuat untuk demonstrasi tanda tangan digital client-side. Tidak menyimpan file atau kunci.
-  </footer>
 
   <script src="script.js"></script>
 </body>
