@@ -213,33 +213,29 @@ document.getElementById("verifyButton").addEventListener("click", async () => {
 // =============================================================
 // ========== BAGIAN 4. SWITCH TAB (Navigasi antar menu) ========
 // =============================================================
-// Logika sederhana untuk berpindah antar tab di UI.
+// Logika terpusat untuk mengelola perpindahan tab di UI.
 
-document.getElementById("tab-sign").addEventListener("click", () => {
-  document.getElementById("tab-sign").classList.add("active");
-  document.getElementById("tab-verify").classList.remove("active");
-  document.getElementById("content-sign").classList.add("active");
-  document.getElementById("content-verify").classList.remove("active");
-});
+function switchTab(tabId) {
+  // Sembunyikan semua konten dan hapus status aktif dari semua tab
+  document.querySelectorAll(".tab, .content").forEach(el => {
+    el.classList.remove("active");
+  });
 
-document.getElementById("tab-verify").addEventListener("click", () => {
-  document.getElementById("tab-verify").classList.add("active");
-  document.getElementById("tab-sign").classList.remove("active");
-  document.getElementById("content-verify").classList.add("active");
-  document.getElementById("content-sign").classList.remove("active");
-});
+  // Tampilkan tab dan konten yang dipilih
+  document.getElementById(`tab-${tabId}`).classList.add("active");
+  document.getElementById(`content-${tabId}`).classList.add("active");
+}
+
+// Tambahkan event listener ke setiap tab
+document.getElementById("tab-sign").addEventListener("click", () => switchTab("sign"));
+document.getElementById("tab-verify").addEventListener("click", () => switchTab("verify"));
+document.getElementById("tab-verify-signed").addEventListener("click", () => switchTab("verify-signed"));
 
 
 // =============================================================
 // ========== BAGIAN 5. VERIFIKASI SIGNED PDF (Tab 3) ===========
 // =============================================================
 // Tujuan: Mengecek keaslian file PDF yang sudah disigned dan memiliki hash & signature tertanam di dalamnya.
-
-document.getElementById("tab-verify-signed").addEventListener("click", () => {
-  document.querySelectorAll(".tab, .content").forEach(el => el.classList.remove("active"));
-  document.getElementById("tab-verify-signed").classList.add("active");
-  document.getElementById("content-verify-signed").classList.add("active");
-});
 
 // Fungsi untuk mengekstrak teks dari file PDF agar bisa membaca hash & signature yang tertanam
 async function extractTextFromPDF(arrayBuffer) {
