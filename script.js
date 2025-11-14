@@ -2,14 +2,23 @@
 // ===============  PDF DIGITAL SIGNATURE TOOL  =================
 // Fitur: Signing PDF, Verifikasi Signature, dan Verifikasi PDF Signed
 // =============================================================
+//
+// Catatan Konsep:
+// -------------------------------------------------------------
+// • Algoritma RSA: RSASSA-PKCS1-v1_5 (RSA Probabilistic Signature Scheme)
+// • Hash yang digunakan: SHA-256
+// • Signature: private key → sign(hash)
+// • Verifikasi: public key → verify(hash, signature)
+// • Model implementasi: "Detached Signature" (hash & signature disimpan terbuka)
+// =============================================================
 
 
 // =============================================================
 // ========== BAGIAN 1. UTILITAS (fungsi umum pendukung) =========
 // =============================================================
 
-// Fungsi untuk membaca file menjadi ArrayBuffer
-// Digunakan agar PDF bisa diproses secara biner oleh WebCrypto API.
+// Fungsi untuk membaca file menjadi ArrayBuffer (bentuk biner).
+// Digunakan oleh WebCrypto API untuk proses hashing dan signing.
 async function fileToArrayBuffer(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -20,24 +29,28 @@ async function fileToArrayBuffer(file) {
 }
 
 // Fungsi untuk menghitung hash SHA-256 dari file PDF.
-// Hash digunakan untuk menjamin **integrity** (tidak ada perubahan isi file).
+// Hash menjamin **integritas** dokumen — setiap perubahan 1 byte pun mengubah hash.
 async function calculateSHA256(buffer) {
   const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Fungsi untuk menandatangani data dengan private key pengguna.
-// Private key diinput dalam format PEM (PKCS#8), diubah ke format biner DER,
-// lalu digunakan untuk menghasilkan signature base64.
+// Fungsi untuk melakukan digital signing dengan private key dalam format PEM (PKCS#8).
+// Langkah:
+// 1. Hapus header/footer PEM → base64
+// 2. Konversi base64 → binary DER
+// 3. Import ke WebCrypto API
+// 4. sign(data) → hasil base64
 async function signWithPrivateKey(privateKeyPem, dataBuffer) {
   const keyData = privateKeyPem
     .replace(/-----BEGIN PRIVATE KEY-----/, "")
     .replace(/-----END PRIVATE KEY-----/, "")
     .replace(/\s+/g, "");
+
   const binaryDer = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
 
-  // Import private key ke WebCrypto API
+  // Import kunci privat ke WebCrypto (RSASSA-PKCS1-v1_5 + SHA-256)
   const privateKey = await crypto.subtle.importKey(
     "pkcs8",
     binaryDer,
@@ -46,18 +59,20 @@ async function signWithPrivateKey(privateKeyPem, dataBuffer) {
     ["sign"]
   );
 
-  // Lakukan proses signing
+  // Proses signing
   const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, dataBuffer);
 
-  // Kembalikan hasil signature dalam format base64
+  // Encode signature → base64
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
+
 
 
 // =============================================================
 // ========== BAGIAN 2. DIGITAL SIGNATURE (Tab 1) ===============
 // =============================================================
-// Tujuan: Menghasilkan tanda tangan digital PDF + menyisipkan hasil signature ke dalam dokumen PDF.
+// Fungsi utama: melakukan digital signature pada PDF dan menyisipkan
+// hash & signature ke dalam halaman terakhir PDF.
 
 document.getElementById("signButton").addEventListener("click", async () => {
   const fileInput = document.getElementById("pdfUploader");
@@ -79,30 +94,30 @@ document.getElementById("signButton").addEventListener("click", async () => {
   try {
     const file = fileInput.files[0];
 
-    // 1️⃣ Baca file PDF sebagai ArrayBuffer
+    // 1️⃣ Baca PDF sebagai ArrayBuffer
     const arrayBuffer = await fileToArrayBuffer(file);
 
-    // 2️⃣ Hitung hash SHA-256 (integrity check)
+    // 2️⃣ Hitung hash SHA-256 (integrity)
     const hashHex = await calculateSHA256(arrayBuffer);
 
-    // 3️⃣ Encode hash dan tanda tangani dengan private key
+    // 3️⃣ Encode hash → sign menggunakan private key
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(hashHex);
     const signatureB64 = await signWithPrivateKey(privateKey, dataBuffer);
 
-    // 4️⃣ Tampilkan hasil hash dan signature
+    // 4️⃣ Tampilkan hash + signature
     hashResult.textContent = hashHex;
     sigResult.textContent = signatureB64;
     results.style.display = "block";
 
-    // 5️⃣ Sisipkan hasil tanda tangan ke dalam PDF (menggunakan PDFLib)
+    // 5️⃣ Sisipkan hash + signature ke PDF menggunakan PDFLib
     const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
     const pages = pdfDoc.getPages();
     const lastPage = pages[pages.length - 1];
     const { width } = lastPage.getSize();
 
-    // Tambahkan teks signature ke halaman terakhir
-    const text = `Digital Signature:
+    // Catatan: menaruh signature sebagai teks biasa → model "PDF annotation".
+    const text = `Digital Signature (RSA-PKCS1v1.5 + SHA-256):
 Hash (SHA-256): ${hashHex}
 Signature (Base64): ${signatureB64.substring(0, 80)}...
 Date: ${new Date().toLocaleString()}`;
@@ -115,7 +130,7 @@ Date: ${new Date().toLocaleString()}`;
       lineHeight: 12,
     });
 
-    // 6️⃣ Simpan PDF yang sudah disigned dan siapkan tombol download
+    // 6️⃣ Export PDF hasil signed → allow download
     const signedPdfBytes = await pdfDoc.save();
     const blob = new Blob([signedPdfBytes], { type: "application/pdf" });
 
@@ -137,17 +152,18 @@ Date: ${new Date().toLocaleString()}`;
 });
 
 
+
 // =============================================================
 // ========== BAGIAN 3. VERIFIKASI SIGNATURE (Tab 2) ============
 // =============================================================
-// Tujuan: Mengecek apakah signature cocok dengan file PDF asli (tanpa modifikasi).
+// Verifikasi signature PDF original (belum signed), hanya hash+signature eksternal.
 
 async function importPublicKey(pem) {
-  // Konversi public key PEM menjadi format DER untuk WebCrypto API
   const keyData = pem
     .replace(/-----BEGIN PUBLIC KEY-----/, "")
     .replace(/-----END PUBLIC KEY-----/, "")
     .replace(/\s+/g, "");
+
   const binaryDer = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
 
   return crypto.subtle.importKey(
@@ -177,15 +193,15 @@ document.getElementById("verifyButton").addEventListener("click", async () => {
     const file = fileInput.files[0];
     const arrayBuffer = await fileToArrayBuffer(file);
 
-    // 1️⃣ Hitung ulang hash SHA-256 dari file PDF yang diupload
+    // 1️⃣ Hitung ulang hash file PDF
     const hashHex = await calculateSHA256(arrayBuffer);
 
-    // 2️⃣ Encode hash untuk diverifikasi dengan public key
+    // 2️⃣ Siapkan data dan signature
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(hashHex);
     const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
 
-    // 3️⃣ Verifikasi signature (menggunakan public key)
+    // 3️⃣ Verifikasi signature (RSA verify)
     const publicKey = await importPublicKey(publicKeyPem);
     const isValid = await crypto.subtle.verify(
       "RSASSA-PKCS1-v1_5",
@@ -194,7 +210,7 @@ document.getElementById("verifyButton").addEventListener("click", async () => {
       dataBuffer
     );
 
-    // 4️⃣ Tampilkan hasil verifikasi
+    // 4️⃣ Output hasil verifikasi
     verifyResultDiv.style.display = "block";
     if (isValid) {
       verifyResultDiv.textContent = "✅ Signature VALID — file belum diubah dan kunci cocok.";
@@ -210,10 +226,11 @@ document.getElementById("verifyButton").addEventListener("click", async () => {
 });
 
 
+
 // =============================================================
 // ========== BAGIAN 4. SWITCH TAB (Navigasi antar menu) ========
 // =============================================================
-// Logika sederhana untuk berpindah antar tab di UI.
+// Mengatur UI tab agar aktif/non-aktif.
 
 document.getElementById("tab-sign").addEventListener("click", () => {
   document.getElementById("tab-sign").classList.add("active");
@@ -230,10 +247,11 @@ document.getElementById("tab-verify").addEventListener("click", () => {
 });
 
 
+
 // =============================================================
 // ========== BAGIAN 5. VERIFIKASI SIGNED PDF (Tab 3) ===========
 // =============================================================
-// Tujuan: Mengecek keaslian file PDF yang sudah disigned dan memiliki hash & signature tertanam di dalamnya.
+// Memverifikasi PDF yang sudah disisipkan hash+signature di dalam file.
 
 document.getElementById("tab-verify-signed").addEventListener("click", () => {
   document.querySelectorAll(".tab, .content").forEach(el => el.classList.remove("active"));
@@ -241,7 +259,7 @@ document.getElementById("tab-verify-signed").addEventListener("click", () => {
   document.getElementById("content-verify-signed").classList.add("active");
 });
 
-// Fungsi untuk mengekstrak teks dari file PDF agar bisa membaca hash & signature yang tertanam
+// Fungsi untuk ekstrak teks dari PDF (mengambil hash & signature tertanam)
 async function extractTextFromPDF(arrayBuffer) {
   const pdfjsLib = window['pdfjs-dist/build/pdf'];
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -278,21 +296,22 @@ document.getElementById("verifySignedButton").addEventListener("click", async ()
     const file = fileInput.files[0];
     const arrayBuffer = await fileToArrayBuffer(file);
 
-    // 1️⃣ Ekstrak teks dari PDF
+    // 1️⃣ Ambil text dari PDF
     const pdfText = await extractTextFromPDF(arrayBuffer);
 
-    // 2️⃣ Temukan hash yang tertanam di PDF
+    // 2️⃣ Ambil hash dari teks PDF
     const match = pdfText.match(/Hash \(SHA-256\): ([A-Fa-f0-9]+)/);
     if (!match) throw new Error("Hash tidak ditemukan di dalam PDF signed.");
 
     const embeddedHash = match[1];
-    console.log("Embedded hash:", embeddedHash);
 
-    // 3️⃣ Import public key dan 4️⃣ Decode signature base64
+    // 3️⃣ Import public key
     const publicKey = await importPublicKey(publicKeyPem);
+
+    // 4️⃣ Decode signature
     const signatureBytes = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
 
-    // 5️⃣ Verifikasi signature terhadap hash tertanam
+    // 5️⃣ Verifikasi signature ↔ hash tertanam
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(embeddedHash);
     const isValid = await crypto.subtle.verify(
@@ -302,7 +321,7 @@ document.getElementById("verifySignedButton").addEventListener("click", async ()
       dataBuffer
     );
 
-    // 6️⃣ Tampilkan hasil verifikasi signed PDF
+    // 6️⃣ Output hasil
     resultDiv.style.display = "block";
     if (isValid) {
       resultDiv.textContent = "✅ Signed PDF VALID — hash cocok dengan signature dan public key.";
